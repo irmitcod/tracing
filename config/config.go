@@ -2,15 +2,42 @@ package config
 
 import (
 	"errors"
-	"github.com/spf13/viper"
 	"log"
+	"time"
+
+	"github.com/spf13/viper"
 )
 
 // App config struct
 type Config struct {
-	Metrics Metrics
-	Logger  Logger
-	Jaeger  Jaeger
+	Server   ServerConfig
+	Postgres PostgresConfig
+	Redis    RedisConfig
+	Cookie   Cookie
+	Session  Session
+	Metrics  Metrics
+	Logger   Logger
+	Jaeger   Jaeger
+}
+
+// Server config struct
+type ServerConfig struct {
+	AppVersion        string
+	Port              string
+	PprofPort         string
+	Mode              string
+	JwtSecretKey      string
+	CookieName        string
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
+	SSL               bool
+	CtxDefaultTimeout time.Duration
+	CSRF              bool
+	Debug             bool
+	MaxConnectionIdle time.Duration
+	Timeout           time.Duration
+	MaxConnectionAge  time.Duration
+	Time              time.Duration
 }
 
 // Logger config
@@ -20,6 +47,45 @@ type Logger struct {
 	DisableStacktrace bool
 	Encoding          string
 	Level             string
+}
+
+// Postgresql config
+type PostgresConfig struct {
+	PostgresqlHost     string
+	PostgresqlPort     string
+	PostgresqlUser     string
+	PostgresqlPassword string
+	PostgresqlDbname   string
+	PostgresqlSSLMode  bool
+	PgDriver           string
+}
+
+// Redis config
+type RedisConfig struct {
+	RedisAddr      string
+	RedisPassword  string
+	RedisDB        string
+	RedisDefaultdb string
+	MinIdleConns   int
+	PoolSize       int
+	PoolTimeout    int
+	Password       string
+	DB             int
+}
+
+// Cookie config
+type Cookie struct {
+	Name     string
+	MaxAge   int
+	Secure   bool
+	HTTPOnly bool
+}
+
+// Session config
+type Session struct {
+	Prefix string
+	Name   string
+	Expire int
 }
 
 // Metrics config

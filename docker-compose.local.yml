@@ -1,0 +1,151 @@
+version: "3.8"
+
+services:
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.3
+    networks:
+      - elastic-jaeger
+    ports:
+      - "127.0.0.1:9200:9200"
+      - "127.0.0.1:9300:9300"
+    restart: on-failure
+    environment:
+      - cluster.name=jaeger-cluster
+      - discovery.type=single-node
+      - http.host=0.0.0.0
+      - transport.host=127.0.0.1
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector
+    ports:
+      - "14269:14269"
+      - "14268:14268"
+      - "14267:14267"
+      - "14250:14250"
+      - "9411:9411"
+    networks:
+      - elastic-jaeger
+    restart: on-failure
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+    command: [
+        "--es.server-urls=http://elasticsearch:9200",
+        "--es.num-shards=1",
+        "--es.num-replicas=0",
+        "--log-level=error"
+    ]
+    depends_on:
+      - elasticsearch
+  redis:
+    image: redis:latest
+    container_name: auth_redis
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - elastic-jaeger
+
+  postgesql:
+    image: postgres:latest
+    container_name: auth_postgesql
+    ports:
+      - "5432:5432"
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=auth_db
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - elastic-jaeger
+
+  prometheus:
+    container_name: prometheus_container
+    image: prom/prometheus
+    volumes:
+      - ./docker/monitoring/prometheus-local.yml:/etc/prometheus/prometheus.yml:Z
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention=20d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - '9090:9090'
+    networks:
+      - elastic-jaeger
+
+  node_exporter:
+    container_name: node_exporter_container
+    image: prom/node-exporter
+    ports:
+      - '9101:9100'
+    networks:
+      - elastic-jaeger
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    # ports:
+    #   - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    restart: unless-stopped
+    networks:
+      - elastic-jaeger
+
+  grafana:
+    container_name: grafana_container
+    image: grafana/grafana
+    ports:
+      - '3000:3000'
+    networks:
+      - elastic-jaeger
+
+  jaeger:
+    container_name: jaeger_container
+    restart: always
+    image: jaegertracing/all-in-one:latest
+    command: ["--reporter.grpc.host-port=jaeger-collector:14250"]
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - COLLECTOR_ZIPKIN_HTTP_PORT=9411
+    ports:
+      - 5775:5775/udp
+      - 6831:6831/udp
+      - 6832:6832/udp
+      - 5778:5778
+    networks:
+      - elastic-jaeger
+  jaeger-query:
+    image: jaegertracing/jaeger-query
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - no_proxy=localhost
+    ports:
+      - "16686:16686"
+      - "16687:16687"
+    networks:
+      - elastic-jaeger
+    restart: on-failure
+    command: [
+        "--es.server-urls=http://elasticsearch:9200",
+        "--span-storage.type=elasticsearch",
+        "--log-level=debug"
+    ]
+    depends_on:
+      - jaeger
+
+networks:
+  elastic-jaeger:
+    driver: bridge
