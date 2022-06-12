@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
-
 	"time"
 )
 
@@ -50,4 +49,5 @@ func main() {
 			factoryLogger.Bg().Fatal(err.Error())
 		}
 	}(ctx)
+
 }
